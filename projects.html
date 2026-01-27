@@ -3,93 +3,149 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>大凸牌計算機</title>
+  <title>籌碼計算機</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    .calc { max-width: 420px; margin: 0 auto; }
-    .display {
+    .app { max-width: 760px; margin: 0 auto; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
+    .row > * { flex: 1 1 160px; }
+
+    label { display:block; font-size: 13px; color: rgba(232,238,252,.75); margin: 2px 0 6px; }
+    select, input {
       width: 100%;
-      font-size: 28px;
-      padding: 14px 12px;
-      border-radius: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.18);
       color: #e8eefc;
       outline: none;
     }
-    .keys {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-    }
-    .key {
-      padding: 12px 10px;
-      border-radius: 14px;
+    input::placeholder { color: rgba(232,238,252,.35); }
+
+    .actions { display:flex; gap:10px; flex-wrap: wrap; margin-top: 10px; }
+    .btn2 {
+      padding: 10px 12px;
+      border-radius: 12px;
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(255,255,255,.06);
       color: #e8eefc;
-      font-size: 18px;
       cursor: pointer;
       user-select: none;
+      text-decoration: none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
     }
-    .key:hover { border-color: rgba(255,255,255,.30); }
-    .key.op { background: rgba(110,168,254,.14); }
-    .key.danger { background: rgba(255,80,80,.12); }
-    .key.wide { grid-column: span 2; }
+    .btn2:hover { border-color: rgba(255,255,255,.30); }
+    .btn2.primary { background: rgba(110,168,254,.14); }
+    .btn2.danger { background: rgba(255,80,80,.12); }
+
+    .chips {
+      display:flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+    }
+    .chip {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: rgba(232,238,252,.9);
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+    }
+    .chip:hover { border-color: rgba(255,255,255,.30); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td {
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      padding: 10px 6px;
+      text-align: left;
+      font-size: 14px;
+    }
+    th { color: rgba(232,238,252,.75); font-weight: 600; }
+    .pos { color: #9fe8a7; }
+    .neg { color: #ffb0b0; }
+    .muted { color: rgba(232,238,252,.65); }
+
+    .history {
+      margin-top: 12px;
+      max-height: 260px;
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      padding: 10px;
+      background: rgba(0,0,0,.12);
+    }
+    .hitem { padding: 8px 6px; border-bottom: 1px dashed rgba(255,255,255,.12); }
+    .hitem:last-child { border-bottom: none; }
+    .small { font-size: 12px; color: rgba(232,238,252,.60); margin-top: 6px; }
   </style>
 </head>
 <body>
   <nav>
     <div class="container nav-inner">
-      <div class="brand">大凸牌計算機</div>
+      <div class="brand">MySite</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
-        <a href="about.html">菜翔翔</a>
-        <a href="projects.html">大凸牌計算機</a>
+        <a href="about.html">關於我</a>
+        <a href="projects.html">作品集</a>
       </div>
     </div>
   </nav>
 
   <main class="container">
     <section class="hero">
-      <h1>大凸牌計算機</h1>
-      <p>支援 + − × ÷、小數點與括號。按 Enter 等於、Backspace 刪除。</p>
+      <h1>麻將籌碼計算機</h1>
+      <p>記「誰付誰多少（50/100…）」即可。下方會顯示每個人的籌碼差額（總和永遠為 0）。</p>
     </section>
 
     <section class="grid">
-      <div class="card calc">
-        <input id="display" class="display" type="text" inputmode="decimal" placeholder="0" autocomplete="off" />
-
-        <div class="keys" id="keys">
-          <button class="key danger" data-act="clear">AC</button>
-          <button class="key" data-act="back">⌫</button>
-          <button class="key op" data-val="(">(</button>
-          <button class="key op" data-val=")">)</button>
-
-          <button class="key" data-val="7">7</button>
-          <button class="key" data-val="8">8</button>
-          <button class="key" data-val="9">9</button>
-          <button class="key op" data-val="/">÷</button>
-
-          <button class="key" data-val="4">4</button>
-          <button class="key" data-val="5">5</button>
-          <button class="key" data-val="6">6</button>
-          <button class="key op" data-val="*">×</button>
-
-          <button class="key" data-val="1">1</button>
-          <button class="key" data-val="2">2</button>
-          <button class="key" data-val="3">3</button>
-          <button class="key op" data-val="-">−</button>
-
-          <button class="key wide" data-val="0">0</button>
-          <button class="key" data-val=".">.</button>
-          <button class="key op" data-val="+">+</button>
-
-          <button class="key wide op" data-act="eq">=</button>
+      <div class="card app">
+        <div class="row">
+          <div>
+            <label>付款者（A要給B → A 是付款者）</label>
+            <select id="payer"></select>
+          </div>
+          <div>
+            <label>收款者（A要給B → B 是收款者）</label>
+            <select id="receiver"></select>
+          </div>
+          <div>
+            <label>金額</label>
+            <input id="amount" type="number" inputmode="numeric" placeholder="例如 50" min="1" />
+          </div>
         </div>
 
-        <p id="hint" style="margin:10px 0 0; color: rgba(232,238,252,.75); font-size: 14px;"></p>
+        <div class="chips" aria-label="快速金額">
+          <span class="chip" data-amt="50">+50</span>
+          <span class="chip" data-amt="100">+100</span>
+          <span class="chip" data-amt="200">+200</span>
+          <span class="chip" data-amt="500">+500</span>
+        </div>
+
+        <div class="actions">
+          <button class="btn2 primary" id="add">新增紀錄</button>
+          <button class="btn2" id="undo">復原上一步</button>
+          <button class="btn2 danger" id="reset">全部重置</button>
+        </div>
+
+        <div class="small" id="hint"></div>
+
+        <h3 style="margin:16px 0 6px;">目前差額</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>玩家</th>
+              <th>差額（+代表贏/收，-代表輸/付）</th>
+            </tr>
+          </thead>
+          <tbody id="score"></tbody>
+        </table>
+
+        <h3 style="margin:16px 0 6px;">紀錄</h3>
+        <div class="history" id="history"></div>
+        <div class="small">提示：你也可以直接用鍵盤輸入金額，然後按「新增紀錄」。</div>
       </div>
     </section>
   </main>
@@ -99,103 +155,150 @@
   </footer>
 
   <script>
-    const display = document.getElementById("display");
+    const PLAYERS = ["A", "B", "C", "D"];
+    const payerSel = document.getElementById("payer");
+    const receiverSel = document.getElementById("receiver");
+    const amountInp = document.getElementById("amount");
     const hint = document.getElementById("hint");
+    const scoreBody = document.getElementById("score");
+    const historyBox = document.getElementById("history");
 
-    function sanitize(expr) {
-      // 只允許：數字、空白、小數點、+ - * / ( )
-      const ok = /^[0-9+\-*/().\s]*$/;
-      return ok.test(expr) ? expr : null;
+    const KEY = "mahjong_chip_calc_v1";
+
+    function defaultState() {
+      const balances = {};
+      PLAYERS.forEach(p => balances[p] = 0);
+      return { balances, history: [] };
     }
 
-    function evaluate() {
-      const raw = display.value.trim();
-      const expr = sanitize(raw);
-      if (expr === null) {
-        hint.textContent = "含有不允許的字元。";
-        return;
-      }
-      if (expr === "") { display.value = ""; hint.textContent = ""; return; }
-
+    function loadState() {
       try {
-        // 用 Function 計算（比 eval 更可控一點），仍然靠 sanitize 保護
-        const result = Function("return (" + expr + ")")();
-        if (Number.isFinite(result)) {
-          display.value = String(result);
-          hint.textContent = "";
-        } else {
-          hint.textContent = "結果不是有限數。";
-        }
-      } catch {
-        hint.textContent = "算式有誤，請檢查括號或運算子。";
-      }
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return defaultState();
+        const obj = JSON.parse(raw);
+        if (!obj || !obj.balances || !obj.history) return defaultState();
+        return obj;
+      } catch { return defaultState(); }
     }
 
-    document.getElementById("keys").addEventListener("click", (e) => {
-      const btn = e.target.closest("button");
-      if (!btn) return;
+    function saveState() {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
 
-      const act = btn.dataset.act;
-      const val = btn.dataset.val;
+    let state = loadState();
 
-      if (act === "clear") {
-        display.value = "";
-        hint.textContent = "";
-        display.focus();
+    function renderSelects() {
+      const makeOptions = () => PLAYERS.map(p => `<option value="${p}">${p}</option>`).join("");
+      payerSel.innerHTML = makeOptions();
+      receiverSel.innerHTML = makeOptions();
+      payerSel.value = "A";
+      receiverSel.value = "B";
+    }
+
+    function fmt(n) {
+      const sign = n > 0 ? "+" : "";
+      return sign + n;
+    }
+
+    function renderScores() {
+      scoreBody.innerHTML = PLAYERS.map(p => {
+        const v = state.balances[p] || 0;
+        const cls = v > 0 ? "pos" : (v < 0 ? "neg" : "muted");
+        return `<tr><td>${p}</td><td class="${cls}">${fmt(v)}</td></tr>`;
+      }).join("");
+
+      const sum = PLAYERS.reduce((acc,p)=>acc+(state.balances[p]||0), 0);
+      hint.textContent = `檢查：四人總和 = ${sum}（正常應為 0）`;
+    }
+
+    function renderHistory() {
+      if (state.history.length === 0) {
+        historyBox.innerHTML = `<div class="muted">尚無紀錄</div>`;
         return;
       }
-      if (act === "back") {
-        display.value = display.value.slice(0, -1);
-        hint.textContent = "";
-        display.focus();
-        return;
+      historyBox.innerHTML = state.history.slice().reverse().map((h, idxFromEnd) => {
+        const t = new Date(h.ts).toLocaleString();
+        return `<div class="hitem">
+          <div><b>${h.payer}</b> → <b>${h.receiver}</b>　<span class="muted">${h.amount}</span></div>
+          <div class="small">${t}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function addRecord(payer, receiver, amount) {
+      if (!PLAYERS.includes(payer) || !PLAYERS.includes(receiver)) return;
+      if (payer === receiver) { hint.textContent = "付款者與收款者不能相同。"; return; }
+      if (!Number.isFinite(amount) || amount <= 0) { hint.textContent = "金額請輸入正整數。"; return; }
+
+      state.balances[payer] = (state.balances[payer] || 0) - amount;
+      state.balances[receiver] = (state.balances[receiver] || 0) + amount;
+
+      state.history.push({ payer, receiver, amount, ts: Date.now() });
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已新增紀錄。";
+    }
+
+    function undo() {
+      const last = state.history.pop();
+      if (!last) { hint.textContent = "沒有可以復原的紀錄。"; return; }
+
+      // 反向還原
+      state.balances[last.payer] = (state.balances[last.payer] || 0) + last.amount;
+      state.balances[last.receiver] = (state.balances[last.receiver] || 0) - last.amount;
+
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已復原上一步。";
+    }
+
+    function resetAll() {
+      state = defaultState();
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已重置。";
+    }
+
+    document.getElementById("add").addEventListener("click", () => {
+      const payer = payerSel.value;
+      const receiver = receiverSel.value;
+      const amount = parseInt(amountInp.value, 10);
+      addRecord(payer, receiver, amount);
+      amountInp.focus();
+      amountInp.select();
+    });
+
+    document.getElementById("undo").addEventListener("click", undo);
+    document.getElementById("reset").addEventListener("click", resetAll);
+
+    document.querySelectorAll(".chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const add = parseInt(chip.dataset.amt, 10);
+        const cur = parseInt(amountInp.value || "0", 10);
+        amountInp.value = String((Number.isFinite(cur) ? cur : 0) + add);
+        amountInp.focus();
+      });
+    });
+
+    amountInp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("add").click();
       }
-      if (act === "eq") {
-        evaluate();
-        display.focus();
-        return;
-      }
-      if (val) {
-        display.value += val;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        amountInp.value = "";
         hint.textContent = "";
-        display.focus();
       }
     });
 
-display.addEventListener("keydown", (e) => {
-  // Enter = 計算
-  if (e.key === "Enter") {
-    e.preventDefault();
-    evaluate();
-    return;
-  }
-
-  // Esc = 清空
-  if (e.key === "Escape") {
-    e.preventDefault();
-    display.value = "";
-    hint.textContent = "";
-    return;
-  }
-
-  // 把 × ÷ x 轉成 * /
-  if (e.key === "×" || e.key === "x" || e.key === "X") {
-    e.preventDefault();
-    display.value += "*";
-    hint.textContent = "";
-    return;
-  }
-  if (e.key === "÷") {
-    e.preventDefault();
-    display.value += "/";
-    hint.textContent = "";
-    return;
-  }
-});
-
-
+    // init
+    renderSelects();
+    renderScores();
+    renderHistory();
   </script>
 </body>
 </html>
-
-
