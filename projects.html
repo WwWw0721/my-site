@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>籌碼計算機</title>
+  <title>麻將計算機</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     .app { max-width: 760px; margin: 0 auto; }
@@ -41,9 +41,7 @@
     .btn2.primary { background: rgba(110,168,254,.14); }
     .btn2.danger { background: rgba(255,80,80,.12); }
 
-    .chips {
-      display:flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
-    }
+    .chips { display:flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
     .chip {
       padding: 8px 10px;
       border-radius: 999px;
@@ -88,16 +86,16 @@
       <div class="brand">MySite</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
-        <a href="about.html">關於我</a>
-        <a href="projects.html">作品集</a>
+        <a href="about.html">菜翔翔</a>
+        <a href="projects.html">麻將計算機</a>
       </div>
     </div>
   </nav>
 
   <main class="container">
     <section class="hero">
-      <h1>麻將籌碼計算機</h1>
-      <p>記「誰付誰多少（50/100…）」即可。下方會顯示每個人的籌碼差額（總和永遠為 0）。</p>
+      <h1>麻將計算機</h1>
+      <p>麻將計算機</p>
     </section>
 
     <section class="grid">
@@ -113,15 +111,13 @@
           </div>
           <div>
             <label>金額</label>
-            <input id="amount" type="number" inputmode="numeric" placeholder="例如 50" min="1" />
+            <input id="amount" type="number" inputmode="numeric" placeholder="例如 10 或 30" min="1" />
           </div>
         </div>
 
         <div class="chips" aria-label="快速金額">
-          <span class="chip" data-amt="50">+50</span>
-          <span class="chip" data-amt="100">+100</span>
-          <span class="chip" data-amt="200">+200</span>
-          <span class="chip" data-amt="500">+500</span>
+          <span class="chip" data-amt="10">+10</span>
+          <span class="chip" data-amt="30">+30</span>
         </div>
 
         <div class="actions">
@@ -203,102 +199,4 @@
     function renderScores() {
       scoreBody.innerHTML = PLAYERS.map(p => {
         const v = state.balances[p] || 0;
-        const cls = v > 0 ? "pos" : (v < 0 ? "neg" : "muted");
-        return `<tr><td>${p}</td><td class="${cls}">${fmt(v)}</td></tr>`;
-      }).join("");
-
-      const sum = PLAYERS.reduce((acc,p)=>acc+(state.balances[p]||0), 0);
-      hint.textContent = `檢查：四人總和 = ${sum}（正常應為 0）`;
-    }
-
-    function renderHistory() {
-      if (state.history.length === 0) {
-        historyBox.innerHTML = `<div class="muted">尚無紀錄</div>`;
-        return;
-      }
-      historyBox.innerHTML = state.history.slice().reverse().map((h, idxFromEnd) => {
-        const t = new Date(h.ts).toLocaleString();
-        return `<div class="hitem">
-          <div><b>${h.payer}</b> → <b>${h.receiver}</b>　<span class="muted">${h.amount}</span></div>
-          <div class="small">${t}</div>
-        </div>`;
-      }).join("");
-    }
-
-    function addRecord(payer, receiver, amount) {
-      if (!PLAYERS.includes(payer) || !PLAYERS.includes(receiver)) return;
-      if (payer === receiver) { hint.textContent = "付款者與收款者不能相同。"; return; }
-      if (!Number.isFinite(amount) || amount <= 0) { hint.textContent = "金額請輸入正整數。"; return; }
-
-      state.balances[payer] = (state.balances[payer] || 0) - amount;
-      state.balances[receiver] = (state.balances[receiver] || 0) + amount;
-
-      state.history.push({ payer, receiver, amount, ts: Date.now() });
-      saveState();
-      renderScores();
-      renderHistory();
-      hint.textContent = "已新增紀錄。";
-    }
-
-    function undo() {
-      const last = state.history.pop();
-      if (!last) { hint.textContent = "沒有可以復原的紀錄。"; return; }
-
-      // 反向還原
-      state.balances[last.payer] = (state.balances[last.payer] || 0) + last.amount;
-      state.balances[last.receiver] = (state.balances[last.receiver] || 0) - last.amount;
-
-      saveState();
-      renderScores();
-      renderHistory();
-      hint.textContent = "已復原上一步。";
-    }
-
-    function resetAll() {
-      state = defaultState();
-      saveState();
-      renderScores();
-      renderHistory();
-      hint.textContent = "已重置。";
-    }
-
-    document.getElementById("add").addEventListener("click", () => {
-      const payer = payerSel.value;
-      const receiver = receiverSel.value;
-      const amount = parseInt(amountInp.value, 10);
-      addRecord(payer, receiver, amount);
-      amountInp.focus();
-      amountInp.select();
-    });
-
-    document.getElementById("undo").addEventListener("click", undo);
-    document.getElementById("reset").addEventListener("click", resetAll);
-
-    document.querySelectorAll(".chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        const add = parseInt(chip.dataset.amt, 10);
-        const cur = parseInt(amountInp.value || "0", 10);
-        amountInp.value = String((Number.isFinite(cur) ? cur : 0) + add);
-        amountInp.focus();
-      });
-    });
-
-    amountInp.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        document.getElementById("add").click();
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        amountInp.value = "";
-        hint.textContent = "";
-      }
-    });
-
-    // init
-    renderSelects();
-    renderScores();
-    renderHistory();
-  </script>
-</body>
-</html>
+        const cls = v > 0 ? "pos"
