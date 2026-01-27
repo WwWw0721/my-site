@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我的個人網站</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav>
+    <div class="container nav-inner">
+      <div class="brand">MySite</div>
+      <div class="nav-links">
+        <a href="index.html">首頁</a>
+        <a href="about.html">關於我</a>
+        <a href="projects.html">作品集</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="hero">
+      <h1>你好，我是（你的名字）</h1>
+      <p>
+        我目前學過 C / C++ / Java，正在開始做自己的網站。
+        這個網站用最簡單的 HTML + CSS 完成，之後會逐步加入更多功能。
+      </p>
+      <a class="btn" href="projects.html">看我的作品 →</a>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>我會的技術</h3>
+        <div class="badges">
+          <span class="badge">C</span>
+          <span class="badge">C++</span>
+          <span class="badge">Java</span>
+          <span class="badge">HTML</span>
+          <span class="badge">CSS</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>我想做的方向</h3>
+        <p>個人網站上線 → 作品集整理 → 之後再學 JS / 後端（Spring Boot）。</p>
+      </div>
+
+      <div class="card">
+        <h3>聯絡方式</h3>
+        <p>把你的 Email / IG / GitHub 放這裡。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    © <span id="y"></span> （你的名字）
+    <script>document.getElementById("y").textContent = new Date().getFullYear();</script>
+  </footer>
+</body>
+</html>
