@@ -125,11 +125,11 @@
         <div class="modebar">
           <label>
             <input type="radio" name="mode" value="single" checked>
-            單筆（A 給 B）
+            放槍
           </label>
           <label>
             <input type="radio" name="mode" value="zimo">
-            自摸（三家同付）
+            自摸
           </label>
         </div>
 
@@ -137,7 +137,7 @@
         <div id="singlePanel">
           <div class="row">
             <div>
-              <label>付款者（A要給B → A 是付款者）</label>
+              <label>放槍</label>
               <select id="payer">
                 <option value="A">A</option>
                 <option value="B">B</option>
@@ -146,7 +146,7 @@
               </select>
             </div>
             <div>
-              <label>收款者（A要給B → B 是收款者）</label>
+              <label>胡牌</label>
               <select id="receiver">
                 <option value="A">A</option>
                 <option value="B">B</option>
@@ -165,7 +165,7 @@
         <div id="zimoPanel" class="hide">
           <div class="row">
             <div>
-              <label>贏家（收錢的人）</label>
+              <label>自摸</label>
               <select id="winner">
                 <option value="A">A</option>
                 <option value="B">B</option>
@@ -178,8 +178,6 @@
               <input id="zimoAmount" type="number" inputmode="numeric" placeholder="例如 10 或 30" min="1" />
             </div>
             <div>
-              <label>說明</label>
-              <input type="text" value="其他三家各付同樣金額給贏家" disabled />
             </div>
           </div>
         </div>
@@ -478,3 +476,4 @@
   </script>
 </body>
 </html>
+
