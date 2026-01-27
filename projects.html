@@ -103,11 +103,22 @@
         <div class="row">
           <div>
             <label>付款者（A要給B → A 是付款者）</label>
-            <select id="payer"></select>
+            <!-- 內建選項：就算 JS 沒跑也不會空 -->
+            <select id="payer">
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
           </div>
           <div>
             <label>收款者（A要給B → B 是收款者）</label>
-            <select id="receiver"></select>
+            <select id="receiver">
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
           </div>
           <div>
             <label>金額</label>
@@ -183,14 +194,6 @@
 
     let state = loadState();
 
-    function renderSelects() {
-      const makeOptions = () => PLAYERS.map(p => `<option value="${p}">${p}</option>`).join("");
-      payerSel.innerHTML = makeOptions();
-      receiverSel.innerHTML = makeOptions();
-      payerSel.value = "A";
-      receiverSel.value = "B";
-    }
-
     function fmt(n) {
       const sign = n > 0 ? "+" : "";
       return sign + n;
@@ -199,4 +202,100 @@
     function renderScores() {
       scoreBody.innerHTML = PLAYERS.map(p => {
         const v = state.balances[p] || 0;
-        const cls = v > 0 ? "pos"
+        const cls = v > 0 ? "pos" : (v < 0 ? "neg" : "muted");
+        return `<tr><td>${p}</td><td class="${cls}">${fmt(v)}</td></tr>`;
+      }).join("");
+
+      const sum = PLAYERS.reduce((acc,p)=>acc+(state.balances[p]||0), 0);
+      hint.textContent = `檢查：四人總和 = ${sum}（正常應為 0）`;
+    }
+
+    function renderHistory() {
+      if (state.history.length === 0) {
+        historyBox.innerHTML = `<div class="muted">尚無紀錄</div>`;
+        return;
+      }
+      historyBox.innerHTML = state.history.slice().reverse().map((h) => {
+        const t = new Date(h.ts).toLocaleString();
+        return `<div class="hitem">
+          <div><b>${h.payer}</b> → <b>${h.receiver}</b>　<span class="muted">${h.amount}</span></div>
+          <div class="small">${t}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function addRecord(payer, receiver, amount) {
+      if (!PLAYERS.includes(payer) || !PLAYERS.includes(receiver)) return;
+      if (payer === receiver) { hint.textContent = "付款者與收款者不能相同。"; return; }
+      if (!Number.isFinite(amount) || amount <= 0) { hint.textContent = "金額請輸入正整數。"; return; }
+
+      state.balances[payer] = (state.balances[payer] || 0) - amount;
+      state.balances[receiver] = (state.balances[receiver] || 0) + amount;
+
+      state.history.push({ payer, receiver, amount, ts: Date.now() });
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已新增紀錄。";
+    }
+
+    function undo() {
+      const last = state.history.pop();
+      if (!last) { hint.textContent = "沒有可以復原的紀錄。"; return; }
+
+      state.balances[last.payer] = (state.balances[last.payer] || 0) + last.amount;
+      state.balances[last.receiver] = (state.balances[last.receiver] || 0) - last.amount;
+
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已復原上一步。";
+    }
+
+    function resetAll() {
+      state = defaultState();
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已重置。";
+    }
+
+    document.getElementById("add").addEventListener("click", () => {
+      const payer = payerSel.value;
+      const receiver = receiverSel.value;
+      const amount = parseInt(amountInp.value, 10);
+      addRecord(payer, receiver, amount);
+      amountInp.focus();
+      amountInp.select();
+    });
+
+    document.getElementById("undo").addEventListener("click", undo);
+    document.getElementById("reset").addEventListener("click", resetAll);
+
+    document.querySelectorAll(".chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const add = parseInt(chip.dataset.amt, 10);
+        const cur = parseInt(amountInp.value || "0", 10);
+        amountInp.value = String((Number.isFinite(cur) ? cur : 0) + add);
+        amountInp.focus();
+      });
+    });
+
+    amountInp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("add").click();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        amountInp.value = "";
+        hint.textContent = "";
+      }
+    });
+
+    // init
+    renderScores();
+    renderHistory();
+  </script>
+</body>
+</html>
