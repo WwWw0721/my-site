@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>計算機</title>
+  <title>大凸牌計算機</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     .calc { max-width: 420px; margin: 0 auto; }
@@ -42,18 +42,18 @@
 <body>
   <nav>
     <div class="container nav-inner">
-      <div class="brand">MySite</div>
+      <div class="brand">大凸牌計算機</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
-        <a href="about.html">關於我</a>
-        <a href="projects.html">作品集</a>
+        <a href="about.html">菜翔翔</a>
+        <a href="projects.html">大凸牌計算機</a>
       </div>
     </div>
   </nav>
 
   <main class="container">
     <section class="hero">
-      <h1>計算機</h1>
+      <h1>大凸牌計算機</h1>
       <p>支援 + − × ÷、小數點與括號。按 Enter 等於、Backspace 刪除。</p>
     </section>
 
@@ -163,14 +163,37 @@
     });
 
     display.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        evaluate();
-      } else if (e.key === "Escape") {
-        display.value = "";
-        hint.textContent = "";
-      }
-    });
+  // Enter = 計算
+  if (e.key === "Enter") {
+    e.preventDefault();
+    evaluate();
+    return;
+  }
+
+  // Esc = 清空
+  if (e.key === "Escape") {
+    e.preventDefault();
+    display.value = "";
+    hint.textContent = "";
+    return;
+  }
+
+  // 把 × ÷ x 轉成 * /
+  if (e.key === "×" || e.key === "x" || e.key === "X") {
+    e.preventDefault();
+    display.value += "*";
+    hint.textContent = "";
+    return;
+  }
+  if (e.key === "÷") {
+    e.preventDefault();
+    display.value += "/";
+    hint.textContent = "";
+    return;
+  }
+});
+
   </script>
 </body>
 </html>
+
