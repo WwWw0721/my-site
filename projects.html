@@ -3,65 +3,174 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>大凸牌計算機</title>
+  <title>計算機</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .calc { max-width: 420px; margin: 0 auto; }
+    .display {
+      width: 100%;
+      font-size: 28px;
+      padding: 14px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      color: #e8eefc;
+      outline: none;
+    }
+    .keys {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .key {
+      padding: 12px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: #e8eefc;
+      font-size: 18px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .key:hover { border-color: rgba(255,255,255,.30); }
+    .key.op { background: rgba(110,168,254,.14); }
+    .key.danger { background: rgba(255,80,80,.12); }
+    .key.wide { grid-column: span 2; }
+  </style>
 </head>
 <body>
   <nav>
     <div class="container nav-inner">
-      <div class="brand">大凸牌計算機</div>
+      <div class="brand">MySite</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
-        <a href="about.html">菜翔翔</a>
-        <a href="projects.html">大凸牌計算機</a>
+        <a href="about.html">關於我</a>
+        <a href="projects.html">作品集</a>
       </div>
     </div>
   </nav>
 
   <main class="container">
     <section class="hero">
-      <h1>大凸牌計算機</h1>
-      <p>晚點做 現在懶</p>
+      <h1>計算機</h1>
+      <p>支援 + − × ÷、小數點與括號。按 Enter 等於、Backspace 刪除。</p>
     </section>
 
     <section class="grid">
-      <div class="card">
-        <h3>還沒做:D</h3>
-        <p>還沒做喔請稍等</p>
-        <div class="badges">
-          <span class="badge">123</span>
-          <span class="badge">123123</span>
-        </div>
-        <a class="btn" href="#" target="_blank" rel="noopener">HUNG DA TOO</a>
-      </div>
+      <div class="card calc">
+        <input id="display" class="display" type="text" inputmode="decimal" placeholder="0" autocomplete="off" />
 
-      <div class="card">
-        <h3>還沒做1</h3>
-        <p>還沒做2</p>
-        <div class="badges">
-          <span class="badge">456</span>
-          <span class="badge">456456</span>
-        </div>
-        <a class="btn" href="#" target="_blank" rel="noopener">789</a>
-      </div>
+        <div class="keys" id="keys">
+          <button class="key danger" data-act="clear">AC</button>
+          <button class="key" data-act="back">⌫</button>
+          <button class="key op" data-val="(">(</button>
+          <button class="key op" data-val=")">)</button>
 
-      <div class="card">
-        <h3>還沒做3</h3>
-        <p>還沒做4</p>
-        <div class="badges">
-          <span class="badge">789789</span>
-          <span class="badge">123456789</span>
+          <button class="key" data-val="7">7</button>
+          <button class="key" data-val="8">8</button>
+          <button class="key" data-val="9">9</button>
+          <button class="key op" data-val="/">÷</button>
+
+          <button class="key" data-val="4">4</button>
+          <button class="key" data-val="5">5</button>
+          <button class="key" data-val="6">6</button>
+          <button class="key op" data-val="*">×</button>
+
+          <button class="key" data-val="1">1</button>
+          <button class="key" data-val="2">2</button>
+          <button class="key" data-val="3">3</button>
+          <button class="key op" data-val="-">−</button>
+
+          <button class="key wide" data-val="0">0</button>
+          <button class="key" data-val=".">.</button>
+          <button class="key op" data-val="+">+</button>
+
+          <button class="key wide op" data-act="eq">=</button>
         </div>
-        <a class="btn" href="#" target="_blank" rel="noopener">連結還沒做</a>
+
+        <p id="hint" style="margin:10px 0 0; color: rgba(232,238,252,.75); font-size: 14px;"></p>
       </div>
     </section>
   </main>
 
-  <footer>© <span id="y"></span> 大凸牌計算機
+  <footer>© <span id="y"></span> MySite
     <script>document.getElementById("y").textContent = new Date().getFullYear();</script>
   </footer>
+
+  <script>
+    const display = document.getElementById("display");
+    const hint = document.getElementById("hint");
+
+    function sanitize(expr) {
+      // 只允許：數字、空白、小數點、+ - * / ( )
+      const ok = /^[0-9+\-*/().\s]*$/;
+      return ok.test(expr) ? expr : null;
+    }
+
+    function evaluate() {
+      const raw = display.value.trim();
+      const expr = sanitize(raw);
+      if (expr === null) {
+        hint.textContent = "含有不允許的字元。";
+        return;
+      }
+      if (expr === "") { display.value = ""; hint.textContent = ""; return; }
+
+      try {
+        // 用 Function 計算（比 eval 更可控一點），仍然靠 sanitize 保護
+        const result = Function("return (" + expr + ")")();
+        if (Number.isFinite(result)) {
+          display.value = String(result);
+          hint.textContent = "";
+        } else {
+          hint.textContent = "結果不是有限數。";
+        }
+      } catch {
+        hint.textContent = "算式有誤，請檢查括號或運算子。";
+      }
+    }
+
+    document.getElementById("keys").addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+
+      const act = btn.dataset.act;
+      const val = btn.dataset.val;
+
+      if (act === "clear") {
+        display.value = "";
+        hint.textContent = "";
+        display.focus();
+        return;
+      }
+      if (act === "back") {
+        display.value = display.value.slice(0, -1);
+        hint.textContent = "";
+        display.focus();
+        return;
+      }
+      if (act === "eq") {
+        evaluate();
+        display.focus();
+        return;
+      }
+      if (val) {
+        display.value += val;
+        hint.textContent = "";
+        display.focus();
+      }
+    });
+
+    display.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        evaluate();
+      } else if (e.key === "Escape") {
+        display.value = "";
+        hint.textContent = "";
+      }
+    });
+  </script>
 </body>
 </html>
-
-
-
