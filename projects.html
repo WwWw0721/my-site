@@ -72,6 +72,12 @@
     }
     .modebar input{ width:auto; }
 
+    .section-title{
+      margin: 14px 0 8px;
+      font-weight: 700;
+      color: rgba(232,238,252,.92);
+    }
+
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td {
       border-bottom: 1px solid rgba(255,255,255,.12);
@@ -121,7 +127,29 @@
     <section class="grid">
       <div class="card app">
 
+        <!-- 玩家名字設定 -->
+        <div class="section-title">玩家名字（可自行改）</div>
+        <div class="row">
+          <div>
+            <label>A 的名字</label>
+            <input id="nameA" type="text" placeholder="輸入名字（留空=顯示 A）" />
+          </div>
+          <div>
+            <label>B 的名字</label>
+            <input id="nameB" type="text" placeholder="輸入名字（留空=顯示 B）" />
+          </div>
+          <div>
+            <label>C 的名字</label>
+            <input id="nameC" type="text" placeholder="輸入名字（留空=顯示 C）" />
+          </div>
+          <div>
+            <label>D 的名字</label>
+            <input id="nameD" type="text" placeholder="輸入名字（留空=顯示 D）" />
+          </div>
+        </div>
+
         <!-- 模式選擇 -->
+        <div class="section-title">記帳模式</div>
         <div class="modebar">
           <label>
             <input type="radio" name="mode" value="single" checked>
@@ -209,7 +237,7 @@
 
         <h3 style="margin:16px 0 6px;">紀錄</h3>
         <div class="history" id="history"></div>
-        <div class="small">提示：單筆/自摸都可以輸入金額後按 Enter 直接新增。</div>
+        <div class="small">提示：輸入金額後按 Enter 可以直接新增。</div>
       </div>
     </section>
   </main>
@@ -220,14 +248,23 @@
 
   <script>
     const PLAYERS = ["A", "B", "C", "D"];
-    const KEY = "mahjong_chip_calc_v2"; // v2：加入自摸紀錄格式
+    const KEY_V3 = "mahjong_chip_calc_v3";
 
     // UI
+    const nameInputs = {
+      A: document.getElementById("nameA"),
+      B: document.getElementById("nameB"),
+      C: document.getElementById("nameC"),
+      D: document.getElementById("nameD"),
+    };
+
     const singlePanel = document.getElementById("singlePanel");
     const zimoPanel = document.getElementById("zimoPanel");
+
     const payerSel = document.getElementById("payer");
     const receiverSel = document.getElementById("receiver");
     const amountInp = document.getElementById("amount");
+
     const winnerSel = document.getElementById("winner");
     const zimoAmountInp = document.getElementById("zimoAmount");
 
@@ -237,40 +274,57 @@
 
     function defaultState() {
       const balances = {};
-      PLAYERS.forEach(p => balances[p] = 0);
-      return { balances, history: [] };
+      const names = {};
+      PLAYERS.forEach(p => { balances[p] = 0; names[p] = ""; }); // 名字留空=顯示 A/B/C/D
+      return { balances, history: [], names };
     }
 
-    // 兼容你舊版 localStorage（如果有）
+    function normalizeState(obj) {
+      const st = defaultState();
+
+      if (obj && obj.balances) {
+        for (const p of PLAYERS) st.balances[p] = Number(obj.balances[p] || 0);
+      }
+      if (obj && Array.isArray(obj.history)) {
+        st.history = obj.history.slice();
+      }
+      if (obj && obj.names) {
+        for (const p of PLAYERS) st.names[p] = String(obj.names[p] ?? "").trim();
+      }
+      return st;
+    }
+
+    // 讀取：優先 v3，否則嘗試 v2 / v1 遷移
     function loadState() {
+      // v3
       try {
-        const raw = localStorage.getItem(KEY);
-        if (raw) {
-          const obj = JSON.parse(raw);
-          if (obj && obj.balances && obj.history) return obj;
+        const raw = localStorage.getItem(KEY_V3);
+        if (raw) return normalizeState(JSON.parse(raw));
+      } catch {}
+
+      // v2
+      try {
+        const raw2 = localStorage.getItem("mahjong_chip_calc_v2");
+        if (raw2) {
+          const obj2 = JSON.parse(raw2);
+          const migrated = normalizeState({ balances: obj2.balances, history: obj2.history, names: {A:"",B:"",C:"",D:""} });
+          localStorage.setItem(KEY_V3, JSON.stringify(migrated));
+          return migrated;
         }
       } catch {}
 
-      // 嘗試讀舊 key（v1）
+      // v1
       try {
-        const old = localStorage.getItem("mahjong_chip_calc_v1");
-        if (old) {
-          const obj = JSON.parse(old);
-          if (obj && obj.balances && obj.history) {
-            // 舊紀錄一律視為單筆
-            const converted = {
-              balances: obj.balances,
-              history: (obj.history || []).map(h => ({
-                type: "single",
-                payer: h.payer,
-                receiver: h.receiver,
-                amount: h.amount,
-                ts: h.ts
-              }))
-            };
-            localStorage.setItem(KEY, JSON.stringify(converted));
-            return converted;
-          }
+        const raw1 = localStorage.getItem("mahjong_chip_calc_v1");
+        if (raw1) {
+          const obj1 = JSON.parse(raw1);
+          const migrated = normalizeState({
+            balances: obj1.balances,
+            history: (obj1.history || []).map(h => ({ type:"single", payer:h.payer, receiver:h.receiver, amount:h.amount, ts:h.ts })),
+            names: {A:"",B:"",C:"",D:""}
+          });
+          localStorage.setItem(KEY_V3, JSON.stringify(migrated));
+          return migrated;
         }
       } catch {}
 
@@ -280,7 +334,26 @@
     let state = loadState();
 
     function saveState() {
-      localStorage.setItem(KEY, JSON.stringify(state));
+      localStorage.setItem(KEY_V3, JSON.stringify(state));
+    }
+
+    function nameOf(id) {
+      const n = (state.names && state.names[id]) ? state.names[id].trim() : "";
+      return n || id;
+    }
+
+    function updateSelectLabels() {
+      [payerSel, receiverSel, winnerSel].forEach(sel => {
+        Array.from(sel.options).forEach(opt => {
+          opt.textContent = nameOf(opt.value);
+        });
+      });
+    }
+
+    function setNameInputsFromState() {
+      for (const p of PLAYERS) {
+        nameInputs[p].value = state.names[p] || "";
+      }
     }
 
     function fmt(n) {
@@ -292,7 +365,7 @@
       scoreBody.innerHTML = PLAYERS.map(p => {
         const v = state.balances[p] || 0;
         const cls = v > 0 ? "pos" : (v < 0 ? "neg" : "muted");
-        return `<tr><td>${p}</td><td class="${cls}">${fmt(v)}</td></tr>`;
+        return `<tr><td>${nameOf(p)}</td><td class="${cls}">${fmt(v)}</td></tr>`;
       }).join("");
 
       const sum = PLAYERS.reduce((acc,p)=>acc+(state.balances[p]||0), 0);
@@ -309,12 +382,12 @@
         const t = new Date(h.ts).toLocaleString();
         if (h.type === "zimo") {
           return `<div class="hitem">
-            <div><b>自摸</b>：<b>${h.winner}</b> 收 <span class="muted">${h.amount}</span> × 3（其他三家各付）</div>
+            <div><b>自摸</b>：<b>${nameOf(h.winner)}</b> 收 <span class="muted">${h.amount}</span> × 3（其他三家各付）</div>
             <div class="small">${t}</div>
           </div>`;
         } else {
           return `<div class="hitem">
-            <div><b>${h.payer}</b> → <b>${h.receiver}</b>　<span class="muted">${h.amount}</span></div>
+            <div><b>${nameOf(h.payer)}</b> → <b>${nameOf(h.receiver)}</b>　<span class="muted">${h.amount}</span></div>
             <div class="small">${t}</div>
           </div>`;
         }
@@ -336,7 +409,6 @@
       hint.textContent = "已新增（單筆）。";
     }
 
-    // 自摸：三家各付 amount 給 winner
     function addZimo(winner, amount) {
       if (!PLAYERS.includes(winner)) return;
       if (!Number.isFinite(amount) || amount <= 0) { hint.textContent = "金額請輸入正整數。"; return; }
@@ -361,7 +433,6 @@
       if (last.type === "zimo") {
         const winner = last.winner;
         const amount = last.amount;
-
         for (const p of PLAYERS) {
           if (p === winner) continue;
           state.balances[p] = (state.balances[p] || 0) + amount;
@@ -371,7 +442,6 @@
         const payer = last.payer;
         const receiver = last.receiver;
         const amount = last.amount;
-
         state.balances[payer] = (state.balances[payer] || 0) + amount;
         state.balances[receiver] = (state.balances[receiver] || 0) - amount;
       }
@@ -385,6 +455,8 @@
     function resetAll() {
       state = defaultState();
       saveState();
+      updateSelectLabels();
+      setNameInputsFromState();
       renderScores();
       renderHistory();
       hint.textContent = "已重置。";
@@ -407,6 +479,17 @@
         amountInp.focus();
       }
       hint.textContent = "";
+    }
+
+    // 名字輸入：即時套用（會存到 localStorage）
+    for (const p of PLAYERS) {
+      nameInputs[p].addEventListener("input", () => {
+        state.names[p] = String(nameInputs[p].value ?? "").trim();
+        saveState();
+        updateSelectLabels();
+        renderScores();
+        renderHistory();
+      });
     }
 
     // Mode change
@@ -470,10 +553,12 @@
     payerSel.value = "A";
     receiverSel.value = "B";
     winnerSel.value = "B";
+
+    setNameInputsFromState();
+    updateSelectLabels();
     applyModeUI();
     renderScores();
     renderHistory();
   </script>
 </body>
 </html>
-
