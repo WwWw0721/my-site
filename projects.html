@@ -54,6 +54,24 @@
     }
     .chip:hover { border-color: rgba(255,255,255,.30); }
 
+    .modebar{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin: 2px 0 10px;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.10);
+    }
+    .modebar label{
+      margin: 0;
+      display:flex; align-items:center; gap:8px;
+      font-size: 14px;
+      color: rgba(232,238,252,.9);
+      cursor:pointer;
+      user-select:none;
+    }
+    .modebar input{ width:auto; }
+
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td {
       border-bottom: 1px solid rgba(255,255,255,.12);
@@ -78,6 +96,8 @@
     .hitem { padding: 8px 6px; border-bottom: 1px dashed rgba(255,255,255,.12); }
     .hitem:last-child { border-bottom: none; }
     .small { font-size: 12px; color: rgba(232,238,252,.60); margin-top: 6px; }
+
+    .hide { display:none !important; }
   </style>
 </head>
 <body>
@@ -100,32 +120,71 @@
 
     <section class="grid">
       <div class="card app">
-        <div class="row">
-          <div>
-            <label>放槍了哈哈哈</label>
-            <!-- 內建選項：就算 JS 沒跑也不會空 -->
-            <select id="payer">
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-              <option value="D">D</option>
-            </select>
-          </div>
-          <div>
-            <label>胡了好爽</label>
-            <select id="receiver">
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-              <option value="D">D</option>
-            </select>
-          </div>
-          <div>
-            <label>金額</label>
-            <input id="amount" type="number" inputmode="numeric" placeholder="例如 10 或 30" min="1" />
+
+        <!-- 模式選擇 -->
+        <div class="modebar">
+          <label>
+            <input type="radio" name="mode" value="single" checked>
+            單筆（A 給 B）
+          </label>
+          <label>
+            <input type="radio" name="mode" value="zimo">
+            自摸（三家同付）
+          </label>
+        </div>
+
+        <!-- 單筆模式 -->
+        <div id="singlePanel">
+          <div class="row">
+            <div>
+              <label>付款者（A要給B → A 是付款者）</label>
+              <select id="payer">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+            </div>
+            <div>
+              <label>收款者（A要給B → B 是收款者）</label>
+              <select id="receiver">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+            </div>
+            <div>
+              <label>金額</label>
+              <input id="amount" type="number" inputmode="numeric" placeholder="例如 10 或 30" min="1" />
+            </div>
           </div>
         </div>
 
+        <!-- 自摸模式 -->
+        <div id="zimoPanel" class="hide">
+          <div class="row">
+            <div>
+              <label>贏家（收錢的人）</label>
+              <select id="winner">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+            </div>
+            <div>
+              <label>每家要付的金額</label>
+              <input id="zimoAmount" type="number" inputmode="numeric" placeholder="例如 10 或 30" min="1" />
+            </div>
+            <div>
+              <label>說明</label>
+              <input type="text" value="其他三家各付同樣金額給贏家" disabled />
+            </div>
+          </div>
+        </div>
+
+        <!-- 常用金額 -->
         <div class="chips" aria-label="快速金額">
           <span class="chip" data-amt="10">+10</span>
           <span class="chip" data-amt="30">+30</span>
@@ -152,7 +211,7 @@
 
         <h3 style="margin:16px 0 6px;">紀錄</h3>
         <div class="history" id="history"></div>
-        <div class="small">提示：你也可以直接用鍵盤輸入金額，然後按「新增紀錄」。</div>
+        <div class="small">提示：單筆/自摸都可以輸入金額後按 Enter 直接新增。</div>
       </div>
     </section>
   </main>
@@ -163,14 +222,20 @@
 
   <script>
     const PLAYERS = ["A", "B", "C", "D"];
+    const KEY = "mahjong_chip_calc_v2"; // v2：加入自摸紀錄格式
+
+    // UI
+    const singlePanel = document.getElementById("singlePanel");
+    const zimoPanel = document.getElementById("zimoPanel");
     const payerSel = document.getElementById("payer");
     const receiverSel = document.getElementById("receiver");
     const amountInp = document.getElementById("amount");
+    const winnerSel = document.getElementById("winner");
+    const zimoAmountInp = document.getElementById("zimoAmount");
+
     const hint = document.getElementById("hint");
     const scoreBody = document.getElementById("score");
     const historyBox = document.getElementById("history");
-
-    const KEY = "mahjong_chip_calc_v1";
 
     function defaultState() {
       const balances = {};
@@ -178,21 +243,47 @@
       return { balances, history: [] };
     }
 
+    // 兼容你舊版 localStorage（如果有）
     function loadState() {
       try {
         const raw = localStorage.getItem(KEY);
-        if (!raw) return defaultState();
-        const obj = JSON.parse(raw);
-        if (!obj || !obj.balances || !obj.history) return defaultState();
-        return obj;
-      } catch { return defaultState(); }
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (obj && obj.balances && obj.history) return obj;
+        }
+      } catch {}
+
+      // 嘗試讀舊 key（v1）
+      try {
+        const old = localStorage.getItem("mahjong_chip_calc_v1");
+        if (old) {
+          const obj = JSON.parse(old);
+          if (obj && obj.balances && obj.history) {
+            // 舊紀錄一律視為單筆
+            const converted = {
+              balances: obj.balances,
+              history: (obj.history || []).map(h => ({
+                type: "single",
+                payer: h.payer,
+                receiver: h.receiver,
+                amount: h.amount,
+                ts: h.ts
+              }))
+            };
+            localStorage.setItem(KEY, JSON.stringify(converted));
+            return converted;
+          }
+        }
+      } catch {}
+
+      return defaultState();
     }
+
+    let state = loadState();
 
     function saveState() {
       localStorage.setItem(KEY, JSON.stringify(state));
     }
-
-    let state = loadState();
 
     function fmt(n) {
       const sign = n > 0 ? "+" : "";
@@ -211,20 +302,28 @@
     }
 
     function renderHistory() {
-      if (state.history.length === 0) {
+      if (!state.history || state.history.length === 0) {
         historyBox.innerHTML = `<div class="muted">尚無紀錄</div>`;
         return;
       }
+
       historyBox.innerHTML = state.history.slice().reverse().map((h) => {
         const t = new Date(h.ts).toLocaleString();
-        return `<div class="hitem">
-          <div><b>${h.payer}</b> → <b>${h.receiver}</b>　<span class="muted">${h.amount}</span></div>
-          <div class="small">${t}</div>
-        </div>`;
+        if (h.type === "zimo") {
+          return `<div class="hitem">
+            <div><b>自摸</b>：<b>${h.winner}</b> 收 <span class="muted">${h.amount}</span> × 3（其他三家各付）</div>
+            <div class="small">${t}</div>
+          </div>`;
+        } else {
+          return `<div class="hitem">
+            <div><b>${h.payer}</b> → <b>${h.receiver}</b>　<span class="muted">${h.amount}</span></div>
+            <div class="small">${t}</div>
+          </div>`;
+        }
       }).join("");
     }
 
-    function addRecord(payer, receiver, amount) {
+    function addSingle(payer, receiver, amount) {
       if (!PLAYERS.includes(payer) || !PLAYERS.includes(receiver)) return;
       if (payer === receiver) { hint.textContent = "付款者與收款者不能相同。"; return; }
       if (!Number.isFinite(amount) || amount <= 0) { hint.textContent = "金額請輸入正整數。"; return; }
@@ -232,19 +331,52 @@
       state.balances[payer] = (state.balances[payer] || 0) - amount;
       state.balances[receiver] = (state.balances[receiver] || 0) + amount;
 
-      state.history.push({ payer, receiver, amount, ts: Date.now() });
+      state.history.push({ type: "single", payer, receiver, amount, ts: Date.now() });
       saveState();
       renderScores();
       renderHistory();
-      hint.textContent = "已新增紀錄。";
+      hint.textContent = "已新增（單筆）。";
+    }
+
+    // 自摸：三家各付 amount 給 winner
+    function addZimo(winner, amount) {
+      if (!PLAYERS.includes(winner)) return;
+      if (!Number.isFinite(amount) || amount <= 0) { hint.textContent = "金額請輸入正整數。"; return; }
+
+      for (const p of PLAYERS) {
+        if (p === winner) continue;
+        state.balances[p] = (state.balances[p] || 0) - amount;
+        state.balances[winner] = (state.balances[winner] || 0) + amount;
+      }
+
+      state.history.push({ type: "zimo", winner, amount, ts: Date.now() });
+      saveState();
+      renderScores();
+      renderHistory();
+      hint.textContent = "已新增（自摸）。";
     }
 
     function undo() {
       const last = state.history.pop();
       if (!last) { hint.textContent = "沒有可以復原的紀錄。"; return; }
 
-      state.balances[last.payer] = (state.balances[last.payer] || 0) + last.amount;
-      state.balances[last.receiver] = (state.balances[last.receiver] || 0) - last.amount;
+      if (last.type === "zimo") {
+        const winner = last.winner;
+        const amount = last.amount;
+
+        for (const p of PLAYERS) {
+          if (p === winner) continue;
+          state.balances[p] = (state.balances[p] || 0) + amount;
+          state.balances[winner] = (state.balances[winner] || 0) - amount;
+        }
+      } else {
+        const payer = last.payer;
+        const receiver = last.receiver;
+        const amount = last.amount;
+
+        state.balances[payer] = (state.balances[payer] || 0) + amount;
+        state.balances[receiver] = (state.balances[receiver] || 0) - amount;
+      }
 
       saveState();
       renderScores();
@@ -260,43 +392,89 @@
       hint.textContent = "已重置。";
     }
 
+    function getMode() {
+      const checked = document.querySelector('input[name="mode"]:checked');
+      return checked ? checked.value : "single";
+    }
+
+    function applyModeUI() {
+      const mode = getMode();
+      if (mode === "zimo") {
+        singlePanel.classList.add("hide");
+        zimoPanel.classList.remove("hide");
+        zimoAmountInp.focus();
+      } else {
+        zimoPanel.classList.add("hide");
+        singlePanel.classList.remove("hide");
+        amountInp.focus();
+      }
+      hint.textContent = "";
+    }
+
+    // Mode change
+    document.querySelectorAll('input[name="mode"]').forEach(r => {
+      r.addEventListener("change", applyModeUI);
+    });
+
+    // Add
     document.getElementById("add").addEventListener("click", () => {
-      const payer = payerSel.value;
-      const receiver = receiverSel.value;
-      const amount = parseInt(amountInp.value, 10);
-      addRecord(payer, receiver, amount);
-      amountInp.focus();
-      amountInp.select();
+      const mode = getMode();
+      if (mode === "zimo") {
+        const winner = winnerSel.value;
+        const amount = parseInt(zimoAmountInp.value, 10);
+        addZimo(winner, amount);
+        zimoAmountInp.focus();
+        zimoAmountInp.select();
+      } else {
+        const payer = payerSel.value;
+        const receiver = receiverSel.value;
+        const amount = parseInt(amountInp.value, 10);
+        addSingle(payer, receiver, amount);
+        amountInp.focus();
+        amountInp.select();
+      }
     });
 
     document.getElementById("undo").addEventListener("click", undo);
     document.getElementById("reset").addEventListener("click", resetAll);
 
+    // 快速金額：加到目前模式的金額框
     document.querySelectorAll(".chip").forEach(chip => {
       chip.addEventListener("click", () => {
         const add = parseInt(chip.dataset.amt, 10);
-        const cur = parseInt(amountInp.value || "0", 10);
-        amountInp.value = String((Number.isFinite(cur) ? cur : 0) + add);
-        amountInp.focus();
+        const mode = getMode();
+        const target = (mode === "zimo") ? zimoAmountInp : amountInp;
+
+        const cur = parseInt(target.value || "0", 10);
+        target.value = String((Number.isFinite(cur) ? cur : 0) + add);
+        target.focus();
       });
     });
 
-    amountInp.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        document.getElementById("add").click();
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        amountInp.value = "";
-        hint.textContent = "";
-      }
-    });
+    // Enter 快速新增
+    function bindEnter(inp) {
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          document.getElementById("add").click();
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          inp.value = "";
+          hint.textContent = "";
+        }
+      });
+    }
+    bindEnter(amountInp);
+    bindEnter(zimoAmountInp);
 
     // init
+    payerSel.value = "A";
+    receiverSel.value = "B";
+    winnerSel.value = "B";
+    applyModeUI();
     renderScores();
     renderHistory();
   </script>
 </body>
 </html>
-
