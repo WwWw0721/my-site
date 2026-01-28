@@ -50,7 +50,7 @@
       margin-bottom: 8px;
     }
 
-    /* 兩隊名字放大 */
+    /* 兩隊名字 */
     .teamline{
       font-size: 30px;
       font-weight: 900;
@@ -58,6 +58,15 @@
       margin: 2px 0 10px;
       line-height: 1.15;
     }
+
+    /* 比分更大 */
+    .scoreline{
+      font-size: 34px;
+      font-weight: 950;
+      letter-spacing: .4px;
+      margin: 2px 0 6px;
+    }
+
     .status{
       font-size: 16px;
       font-weight: 800;
@@ -65,6 +74,7 @@
     }
     .ok { color: #9fe8a7; }
     .bad { color: #ffb0b0; }
+
     .subline{
       font-size: 14px;
       color: rgba(232,238,252,.72);
@@ -115,13 +125,11 @@
     const TW_TZ = "Asia/Taipei";
     const TEAM_ID_LAKERS = 13;
 
-    // 主要用 schedule：拿到湖人賽程 + 比分 + 狀態（pre/in/post）
     const SCHEDULE_URLS = [
       `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`,
       `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`
     ];
 
-    // NBA 球隊中文名（abbr -> 中文）
     const TEAM_ZH = {
       ATL:"亞特蘭大老鷹", BOS:"波士頓塞爾提克", BKN:"布魯克林籃網", CHA:"夏洛特黃蜂",
       CHI:"芝加哥公牛", CLE:"克里夫蘭騎士", DAL:"達拉斯獨行俠", DEN:"丹佛金塊",
@@ -148,7 +156,6 @@
     }
 
     async function fetchJson(url) {
-      // 先直接抓 ESPN；若遇到 CORS/網路限制，再走 proxy
       try {
         const r = await fetch(url, { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -209,10 +216,6 @@
       };
     }
 
-    // 取「最新三場」：
-    // - 若有進行中：顯示(進行中) + 前2場完場
-    // - 否則若有下一場：顯示(下一場) + 前2場完場
-    // - 否則：顯示最近完場3場
     function pickLatest3(games) {
       const now = Date.now();
       const sorted = games.slice().sort((a,b)=>a.ms-b.ms);
@@ -257,18 +260,27 @@
         const header = `${g.lName} VS ${g.oName}`;
         const twStart = fmtTW(g.date);
 
+        // 只有 pre 顯示開打時間
+        let timeHTML = "";
+        if (g.state === "pre") {
+          timeHTML = `<div class="subline">台灣開打時間：${twStart}</div>`;
+        }
+
         let statusHTML = "";
         if (g.state === "pre") {
           statusHTML = `<div class="status muted">尚未開打</div>`;
         } else if (g.state === "in") {
           const scoreText = (g.lScore != null && g.oScore != null) ? `${g.lScore} - ${g.oScore}` : "—";
           const extra = g.detail ? `（${g.detail}）` : "";
-          statusHTML = `<div class="status muted">進行中：${scoreText} ${extra}</div>`;
+          statusHTML = `
+            <div class="status muted">進行中 ${extra}</div>
+            <div class="scoreline">${scoreText}</div>
+          `;
         } else {
           const scoreText = (g.lScore != null && g.oScore != null) ? `${g.lScore} - ${g.oScore}` : "—";
           statusHTML = `
             <div class="status ${g.win ? "ok" : "bad"}">結果：${g.win ? "贏球" : "輸球"}</div>
-            <div class="muted">比分：${scoreText}</div>
+            <div class="scoreline">${scoreText}</div>
           `;
         }
 
@@ -277,7 +289,7 @@
             <div class="tag">${labels[idx] || ""}</div>
             <div class="teamline">${header}</div>
             ${statusHTML}
-            <div class="subline">台灣開打時間：${twStart}</div>
+            ${timeHTML}
           </div>
         `;
       }).join("");
@@ -321,8 +333,8 @@
 
     refreshBtn.addEventListener("click", load);
 
-    load();                 // 進頁面自動顯示
-    setInterval(load, 15000); // 每 15 秒自動更新
+    load();
+    setInterval(load, 15000);
   </script>
 </body>
 </html>
