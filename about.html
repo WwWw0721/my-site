@@ -6,28 +6,71 @@
   <title>菜翔翔</title>
   <link rel="stylesheet" href="style.css" />
   <style>
+    .wrap { max-width: 860px; margin: 0 auto; }
     .box{
       border: 1px solid rgba(255,255,255,.12);
       border-radius: 14px;
       padding: 12px;
       background: rgba(0,0,0,.10);
     }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 10px; flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
     .muted { color: rgba(232,238,252,.70); }
-    .ok { color: #9fe8a7; font-weight: 900; }
-    .bad { color: #ffb0b0; font-weight: 900; }
     .small { font-size: 12px; color: rgba(232,238,252,.60); margin-top: 6px; }
 
-    .teamline{
-      font-size: 28px;
-      font-weight: 900;
-      margin: 6px 0 10px;
-      letter-spacing: .3px;
+    .btn2{
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: #e8eefc;
+      cursor: pointer;
+      user-select: none;
     }
+    .btn2:hover { border-color: rgba(255,255,255,.30); }
+
+    .game{
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(0,0,0,.12);
+      margin-top: 10px;
+    }
+    .tag{
+      display:inline-block;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: rgba(232,238,252,.85);
+      margin-bottom: 8px;
+    }
+
+    /* 兩隊名字放大 */
+    .teamline{
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: .3px;
+      margin: 2px 0 10px;
+      line-height: 1.15;
+    }
+    .status{
+      font-size: 16px;
+      font-weight: 800;
+      margin: 0 0 6px;
+    }
+    .ok { color: #9fe8a7; }
+    .bad { color: #ffb0b0; }
     .subline{
       font-size: 14px;
       color: rgba(232,238,252,.72);
       margin-top: 4px;
     }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   </style>
 </head>
 <body>
@@ -45,13 +88,20 @@
   <main class="container">
     <section class="hero">
       <h1>菜翔翔</h1>
-      <p>進網頁會自動顯示洛杉磯湖人隊最新戰況（中文隊名、台灣時間）。</p>
+      <p>湖人最新三場（自動每 15 秒更新，也可手動更新）。</p>
     </section>
 
     <section class="grid">
-      <div class="card box">
-        <div id="out" class="muted">載入中…</div>
-        <div id="meta" class="small"></div>
+      <div class="card box wrap">
+        <div class="topbar">
+          <div>
+            <div style="font-weight:900; font-size:18px;">洛杉磯湖人｜最新三場</div>
+            <div class="small" id="meta">—</div>
+          </div>
+          <button class="btn2" id="refresh">更新</button>
+        </div>
+
+        <div id="list" class="muted">載入中…</div>
       </div>
     </section>
   </main>
@@ -62,13 +112,13 @@
   </footer>
 
   <script>
-    const TEAM_ABBR = "LAL";
     const TW_TZ = "Asia/Taipei";
+    const TEAM_ID_LAKERS = 13;
 
-    // ESPN 兩個來源（任一可用即可）
-    const ESPN_URLS = [
-      "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
-      "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    // 主要用 schedule：拿到湖人賽程 + 比分 + 狀態（pre/in/post）
+    const SCHEDULE_URLS = [
+      `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`,
+      `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`
     ];
 
     // NBA 球隊中文名（abbr -> 中文）
@@ -83,18 +133,9 @@
       UTA:"猶他爵士", WAS:"華盛頓巫師"
     };
 
-    const out = document.getElementById("out");
-    const meta = document.getElementById("meta");
-
-    // 用 LA 日期查 ESPN（資料對齊北美），顯示都用台灣時間
-    function laYYYYMMDD(offsetDays = 0) {
-      const LA_TZ = "America/Los_Angeles";
-      const now = new Date(Date.now() + offsetDays * 86400000);
-      const s = new Intl.DateTimeFormat("en-CA", {
-        timeZone: LA_TZ, year: "numeric", month: "2-digit", day: "2-digit"
-      }).format(now);
-      return s.replaceAll("-", "");
-    }
+    const listEl = document.getElementById("list");
+    const metaEl = document.getElementById("meta");
+    const refreshBtn = document.getElementById("refresh");
 
     function fmtTW(iso) {
       if (!iso) return "—";
@@ -107,6 +148,7 @@
     }
 
     async function fetchJson(url) {
+      // 先直接抓 ESPN；若遇到 CORS/網路限制，再走 proxy
       try {
         const r = await fetch(url, { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -119,109 +161,168 @@
       }
     }
 
-    function findLakersGame(data) {
-      const events = data?.events || [];
-      for (const ev of events) {
-        const comp = ev?.competitions?.[0];
-        const competitors = comp?.competitors || [];
-        const hasLAL = competitors.some(c => c?.team?.abbreviation === TEAM_ABBR);
-        if (!hasLAL) continue;
-
-        const lal = competitors.find(c => c?.team?.abbreviation === TEAM_ABBR);
-        const opp = competitors.find(c => c?.team?.abbreviation !== TEAM_ABBR);
-        return { comp, lal, opp };
-      }
-      return null;
-    }
-
     function zhTeamName(teamObj) {
       const abbr = teamObj?.abbreviation;
       const en = teamObj?.displayName || abbr || "未知隊伍";
       return TEAM_ZH[abbr] || en;
     }
 
-    function render(game) {
-      const { comp, lal, opp } = game;
-
-      const state = comp?.status?.type?.state; // pre / in / post
-      const completed = !!comp?.status?.type?.completed;
-
-      const leftName = zhTeamName(lal?.team);
-      const rightName = zhTeamName(opp?.team);
-
-      const lScore = Number(lal?.score || 0);
-      const oScore = Number(opp?.score || 0);
-
-      const startTW = fmtTW(comp?.date);
-      const header = `<div class="teamline">${leftName} VS ${rightName}</div>`;
-
-      if (state === "pre") {
-        out.innerHTML = `
-          ${header}
-          <div class="muted">尚未開打</div>
-          <div class="subline">台灣開打時間：${startTW}</div>
-        `;
-        return;
-      }
-
-      if (state === "in") {
-        out.innerHTML = `
-          ${header}
-          <div class="muted">進行中：${lScore} - ${oScore}</div>
-          <div class="subline">台灣開打時間：${startTW}</div>
-        `;
-        return;
-      }
-
-      if (state === "post" || completed) {
-        const win = !!lal?.winner || (lScore > oScore);
-        out.innerHTML = `
-          ${header}
-          <div class="${win ? "ok" : "bad"}">結果：${win ? "贏球" : "輸球"}</div>
-          <div class="muted">比分：${lScore} - ${oScore}</div>
-          <div class="subline">台灣開打時間：${startTW}</div>
-        `;
-        return;
-      }
-
-      out.innerHTML = `
-        ${header}
-        <div class="muted">比分：${lScore} - ${oScore}</div>
-        <div class="subline">台灣開打時間：${startTW}</div>
-      `;
+    function scoreNum(comp) {
+      const s = comp?.score;
+      if (s == null) return null;
+      if (typeof s === "number") return s;
+      if (typeof s === "string") return Number(s);
+      if (typeof s === "object") return Number(s.value ?? s.displayValue ?? 0);
+      return null;
     }
 
-    // 「最新」：先查今天（LA），找不到就查昨天（LA）
-    async function loadLatest() {
-      out.textContent = "載入中…";
-      meta.textContent = "";
+    function toGameItem(ev) {
+      const comp = ev?.competitions?.[0];
+      const competitors = comp?.competitors || [];
 
-      const datesToTry = [laYYYYMMDD(0), laYYYYMMDD(-1)];
+      const lal = competitors.find(c => c?.team?.abbreviation === "LAL");
+      const opp = competitors.find(c => c?.team?.abbreviation !== "LAL");
+      if (!lal || !opp) return null;
 
-      for (const date of datesToTry) {
-        for (const base of ESPN_URLS) {
-          try {
-            const url = `${base}?dates=${date}`;
-            const data = await fetchJson(url);
-            const game = findLakersGame(data);
-            if (game) {
-              render(game);
-              meta.textContent = "資料更新時間（台灣）： " + new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ });
-              return;
-            }
-          } catch {
-            // 換下一個來源/日期
-          }
+      const status = comp?.status?.type || {};
+      const state = status?.state;          // pre / in / post
+      const completed = !!status?.completed;
+      const detail = status?.shortDetail || status?.detail || status?.description || "";
+
+      const lScore = scoreNum(lal);
+      const oScore = scoreNum(opp);
+
+      const dateISO = comp?.date || ev?.date;
+      const ms = dateISO ? new Date(dateISO).getTime() : 0;
+
+      return {
+        date: dateISO,
+        ms,
+        state: state || (completed ? "post" : ""),
+        completed,
+        detail,
+        lName: zhTeamName(lal.team),
+        oName: zhTeamName(opp.team),
+        lScore,
+        oScore,
+        win: !!lal.winner
+      };
+    }
+
+    // 取「最新三場」：
+    // - 若有進行中：顯示(進行中) + 前2場完場
+    // - 否則若有下一場：顯示(下一場) + 前2場完場
+    // - 否則：顯示最近完場3場
+    function pickLatest3(games) {
+      const now = Date.now();
+      const sorted = games.slice().sort((a,b)=>a.ms-b.ms);
+
+      const inGame = sorted.find(g => g.state === "in");
+      if (inGame) {
+        const prevFinals = sorted
+          .filter(g => (g.completed || g.state === "post") && g.ms < inGame.ms)
+          .sort((a,b)=>a.ms-b.ms);
+        const last2 = prevFinals.slice(-2).reverse();
+        return [inGame, ...last2].slice(0,3);
+      }
+
+      const nextPre = sorted
+        .filter(g => g.state === "pre" && g.ms >= now)
+        .sort((a,b)=>a.ms-b.ms)[0];
+
+      if (nextPre) {
+        const prevFinals = sorted
+          .filter(g => (g.completed || g.state === "post") && g.ms < now)
+          .sort((a,b)=>a.ms-b.ms);
+        const last2 = prevFinals.slice(-2).reverse();
+        return [nextPre, ...last2].slice(0,3);
+      }
+
+      const finals = sorted
+        .filter(g => g.completed || g.state === "post")
+        .sort((a,b)=>a.ms-b.ms);
+
+      return finals.slice(-3).reverse();
+    }
+
+    function renderGames(games) {
+      if (!games.length) {
+        listEl.textContent = "找不到比賽資料。";
+        return;
+      }
+
+      const labels = ["最新", "前一場", "前二場"];
+
+      listEl.innerHTML = games.map((g, idx) => {
+        const header = `${g.lName} VS ${g.oName}`;
+        const twStart = fmtTW(g.date);
+
+        let statusHTML = "";
+        if (g.state === "pre") {
+          statusHTML = `<div class="status muted">尚未開打</div>`;
+        } else if (g.state === "in") {
+          const scoreText = (g.lScore != null && g.oScore != null) ? `${g.lScore} - ${g.oScore}` : "—";
+          const extra = g.detail ? `（${g.detail}）` : "";
+          statusHTML = `<div class="status muted">進行中：${scoreText} ${extra}</div>`;
+        } else {
+          const scoreText = (g.lScore != null && g.oScore != null) ? `${g.lScore} - ${g.oScore}` : "—";
+          statusHTML = `
+            <div class="status ${g.win ? "ok" : "bad"}">結果：${g.win ? "贏球" : "輸球"}</div>
+            <div class="muted">比分：${scoreText}</div>
+          `;
+        }
+
+        return `
+          <div class="game">
+            <div class="tag">${labels[idx] || ""}</div>
+            <div class="teamline">${header}</div>
+            ${statusHTML}
+            <div class="subline">台灣開打時間：${twStart}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    let isLoading = false;
+
+    async function load() {
+      if (isLoading) return;
+      isLoading = true;
+
+      listEl.textContent = "載入中…";
+
+      for (const url of SCHEDULE_URLS) {
+        try {
+          const data = await fetchJson(url);
+          const events = data?.events || [];
+          const games = events.map(toGameItem).filter(Boolean);
+
+          const latest3 = pickLatest3(games);
+          renderGames(latest3);
+
+          metaEl.innerHTML = `更新時間（台灣）：<span class="mono">${
+            new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ })
+          }</span>（每 15 秒自動更新）`;
+
+          isLoading = false;
+          return;
+        } catch (e) {
+          // 試下一個 URL
         }
       }
 
-      out.textContent = "找不到湖人的最新比賽資料（可能今天/昨天都沒比賽或資料來源暫時不可用）。";
-      meta.textContent = "資料更新時間（台灣）： " + new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ });
+      listEl.textContent = "載入失敗（可能是網路或資料來源暫時不可用）。";
+      metaEl.innerHTML = `更新時間（台灣）：<span class="mono">${
+        new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ })
+      }</span>（每 15 秒自動更新）`;
+
+      isLoading = false;
     }
 
-    // 進頁面自動載入 + 每 60 秒更新一次
-    loadLatest();
-    setInterval(loadLatest, 60000);
+    refreshBtn.addEventListener("click", load);
+
+    load();                 // 進頁面自動顯示
+    setInterval(load, 15000); // 每 15 秒自動更新
   </script>
 </body>
 </html>
