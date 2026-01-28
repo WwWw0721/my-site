@@ -5,15 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>菜翔翔</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    button.btn { background: transparent; cursor: pointer; }
+    .box {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(0,0,0,.10);
+    }
+    .muted { color: rgba(232,238,252,.70); }
+    .big { font-size: 18px; font-weight: 800; margin: 8px 0 6px; }
+    .ok { color: #9fe8a7; font-weight: 800; }
+    .bad { color: #ffb0b0; font-weight: 800; }
+    .small { font-size: 12px; color: rgba(232,238,252,.60); margin-top: 6px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
 </head>
 <body>
   <nav>
     <div class="container nav-inner">
-      <div class="brand">菜翔翔頁面</div>
+      <div class="brand">MySite</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
         <a href="about.html">菜翔翔</a>
-        <a href="projects.html">大凸牌計算機</a>
+        <a href="projects.html">麻將計算機</a>
       </div>
     </div>
   </nav>
@@ -21,35 +36,162 @@
   <main class="container">
     <section class="hero">
       <h1>菜翔翔</h1>
-      <p>我是菜翔翔</p>
+      <p>查詢洛杉磯湖人隊「今天」是否贏球、對手、比分（以洛杉磯日期為準）。</p>
+      <button class="btn" id="btn">查詢今天</button>
     </section>
 
     <section class="grid">
-      <div class="card">
-        <h3>菜翔翔</h3>
-        <p>我是菜翔翔 今年17歲</p>
-      </div>
-
-      <div class="card">
-        <h3>興趣</h3>
-        <p>玩麥塊</p>
-      </div>
-
-      <div class="card">
-        <h3>菜翔翔的學校</h3>
-        <p>
-          高三<br/>
-          台南二中
-        </p>
+      <div class="card box">
+        <div id="out" class="muted">尚未查詢</div>
+        <div id="meta" class="small"></div>
       </div>
     </section>
   </main>
 
-  <footer>© <span id="y"></span> 菜翔翔
+  <footer>
+    © <span id="y"></span> MySite
     <script>document.getElementById("y").textContent = new Date().getFullYear();</script>
   </footer>
+
+  <script>
+    const TEAM_ABBR = "LAL";
+    const LA_TZ = "America/Los_Angeles";
+
+    // 兩個 ESPN 來源（只要其中一個可用即可）
+    const ESPN_URLS = [
+      "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+      "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    ];
+
+    const btn = document.getElementById("btn");
+    const out = document.getElementById("out");
+    const meta = document.getElementById("meta");
+
+    function laYYYYMMDD() {
+      // en-CA 會輸出 YYYY-MM-DD
+      const s = new Intl.DateTimeFormat("en-CA", {
+        timeZone: LA_TZ, year: "numeric", month: "2-digit", day: "2-digit"
+      }).format(new Date());
+      return s.replaceAll("-", "");
+    }
+
+    function fmtLA(iso) {
+      if (!iso) return "";
+      return new Intl.DateTimeFormat("zh-Hant-TW", {
+        timeZone: LA_TZ,
+        month: "numeric", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+        weekday: "short"
+      }).format(new Date(iso));
+    }
+
+    async function fetchJson(url) {
+      // 先直接抓 ESPN；如果被擋（例如 CORS / 網路），再走 proxy（仍然只為了同一功能）
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return await r.json();
+      } catch {
+        const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+        const r2 = await fetch(proxy, { cache: "no-store" });
+        if (!r2.ok) throw new Error("Proxy HTTP " + r2.status);
+        return await r2.json();
+      }
+    }
+
+    function findLakersGame(data) {
+      const events = data?.events || [];
+      for (const ev of events) {
+        const comp = ev?.competitions?.[0];
+        const competitors = comp?.competitors || [];
+        const hasLAL = competitors.some(c => c?.team?.abbreviation === TEAM_ABBR);
+        if (!hasLAL) continue;
+
+        const lal = competitors.find(c => c?.team?.abbreviation === TEAM_ABBR);
+        const opp = competitors.find(c => c?.team?.abbreviation !== TEAM_ABBR);
+        return { comp, lal, opp };
+      }
+      return null;
+    }
+
+    function render({ comp, lal, opp }) {
+      const state = comp?.status?.type?.state; // pre / in / post
+      const desc = comp?.status?.type?.description || "";
+      const completed = !!comp?.status?.type?.completed;
+
+      const lName = lal?.team?.displayName || "Lakers";
+      const oName = opp?.team?.displayName || "Opponent";
+
+      const lScore = Number(lal?.score || 0);
+      const oScore = Number(opp?.score || 0);
+
+      const homeAway = lal?.homeAway; // home/away
+      const vsText = (homeAway === "home") ? `vs ${oName}` : `@ ${oName}`;
+
+      const timeLA = fmtLA(comp?.date);
+
+      if (state === "pre") {
+        out.innerHTML = `
+          <div class="big">${lName} ${vsText}</div>
+          <div class="muted">尚未開打</div>
+          <div class="muted">開打時間（洛杉磯）：${timeLA || "—"}</div>
+        `;
+        return;
+      }
+
+      if (state === "in") {
+        out.innerHTML = `
+          <div class="big">${lName} ${vsText}</div>
+          <div class="muted">進行中：${lScore} - ${oScore}</div>
+          <div class="muted">${desc}</div>
+        `;
+        return;
+      }
+
+      if (state === "post" || completed) {
+        const win = !!lal?.winner || (lScore > oScore);
+        out.innerHTML = `
+          <div class="big">${lName} ${vsText}</div>
+          <div class="${win ? "ok" : "bad"}">結果：${win ? "贏球" : "輸球"}</div>
+          <div class="muted">比分：${lScore} - ${oScore}</div>
+        `;
+        return;
+      }
+
+      out.innerHTML = `
+        <div class="big">${lName} ${vsText}</div>
+        <div class="muted">比分：${lScore} - ${oScore}</div>
+        <div class="muted">${desc || "狀態未知"}</div>
+      `;
+    }
+
+    async function checkToday() {
+      const date = laYYYYMMDD();
+      out.textContent = "查詢中…";
+      meta.innerHTML = `查詢日期（洛杉磯）：<span class="mono">${date}</span>`;
+
+      for (const base of ESPN_URLS) {
+        try {
+          const url = `${base}?dates=${date}`;
+          const data = await fetchJson(url);
+          const game = findLakersGame(data);
+
+          if (!game) {
+            out.textContent = "今天（洛杉磯）沒有找到湖人的比賽。";
+            return;
+          }
+
+          render(game);
+          return;
+        } catch (e) {
+          // 嘗試下一個來源
+        }
+      }
+
+      out.textContent = "查詢失敗（可能是網路或資料來源暫時不可用）。";
+    }
+
+    btn.addEventListener("click", checkToday);
+  </script>
 </body>
 </html>
-
-
-
