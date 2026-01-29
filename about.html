@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>湖人賽程</title>
+  <title>菜翔翔</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     .wrap { max-width: 860px; margin: 0 auto; }
@@ -50,7 +50,14 @@
       margin-bottom: 8px;
     }
 
-    /* 兩隊名字 */
+    /* ✅ 對稱排版：隊名/比分同一個 3 欄 grid，讓 VS 與 - 垂直對齊 */
+    .matchgrid{
+      display:grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: baseline;
+      column-gap: 12px;
+    }
+
     .teamline{
       font-size: 30px;
       font-weight: 900;
@@ -58,21 +65,30 @@
       margin: 2px 0 6px;
       line-height: 1.15;
     }
-    /* VS 不同顏色 */
+    .teamL{ text-align:right; }
+    .teamR{ text-align:left; }
+
     .vs{
       color: #6ea8fe;
       font-weight: 950;
-      padding: 0 8px;
       letter-spacing: .6px;
+      text-align:center;
+      min-width: 40px; /* 讓中間欄穩定 */
     }
 
-    /* 比分更大：放在隊名正下方 */
     .scoreline{
       font-size: 36px;
       font-weight: 950;
       letter-spacing: .6px;
       margin: 0 0 6px;
       line-height: 1.05;
+    }
+    .scoreL{ text-align:right; }
+    .scoreR{ text-align:left; }
+    .dash{
+      text-align:center;
+      min-width: 40px;  /* ✅ 跟 .vs 同寬，保證「-」在 VS 正下方 */
+      opacity: .9;
     }
 
     .status{
@@ -83,11 +99,13 @@
     .ok { color: #9fe8a7; }
     .bad { color: #ffb0b0; }
 
-    .subline{
-      font-size: 14px;
-      color: rgba(232,238,252,.72);
-      margin-top: 4px;
+    .starttime{
+      font-size: 22px;
+      font-weight: 900;
+      color: rgba(232,238,252,.88);
+      margin-top: 6px;
     }
+
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   </style>
 </head>
@@ -97,7 +115,7 @@
       <div class="brand">MySite</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
-        <a href="about.html">湖人</a>
+        <a href="about.html">菜翔翔</a>
         <a href="projects.html">麻將計算機</a>
       </div>
     </div>
@@ -105,7 +123,7 @@
 
   <main class="container">
     <section class="hero">
-      <h1>湖人</h1>
+      <h1>菜翔翔</h1>
       <p>湖人最新三場（自動每 15 秒更新，也可手動更新）。</p>
     </section>
 
@@ -138,7 +156,6 @@
       `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`
     ];
 
-    // 中文隊名表：含 ESPN 常見縮寫別名（避免跑英文）
     const TEAM_ZH = {
       ATL:"亞特蘭大老鷹",
       BOS:"波士頓塞爾提克",
@@ -199,7 +216,6 @@
       }
     }
 
-    // 找不到中文就顯示縮寫（不退回英文）
     function zhTeamName(teamObj) {
       const abbr = teamObj?.abbreviation;
       if (abbr && TEAM_ZH[abbr]) return TEAM_ZH[abbr];
@@ -289,36 +305,50 @@
       const labels = ["最新", "前一場", "前二場"];
 
       listEl.innerHTML = games.map((g, idx) => {
-        const headerHTML = `${g.lName}<span class="vs">VS</span>${g.oName}`;
         const twStart = fmtTW(g.date);
 
-        // 只有 pre 顯示開打時間
-        let timeHTML = "";
-        if (g.state === "pre") {
-          timeHTML = `<div class="subline">台灣開打時間：${twStart}</div>`;
-        }
+        // ✅ 隊名列（對稱）
+        const teamHTML = `
+          <div class="matchgrid teamline">
+            <div class="teamL">${g.lName}</div>
+            <div class="vs">VS</div>
+            <div class="teamR">${g.oName}</div>
+          </div>
+        `;
 
-        // 比分必須在隊名正下方：所以 scoreline 放在最前面（若有）
+        // ✅ 比分列（對稱；「-」在 VS 正下方）
         let scoreHTML = "";
         if (g.state !== "pre") {
-          const scoreText = (g.lScore != null && g.oScore != null) ? `${g.lScore} - ${g.oScore}` : "—";
-          scoreHTML = `<div class="scoreline">${scoreText}</div>`;
+          const L = (g.lScore != null) ? g.lScore : "—";
+          const R = (g.oScore != null) ? g.oScore : "—";
+          scoreHTML = `
+            <div class="matchgrid scoreline">
+              <div class="scoreL">${L}</div>
+              <div class="dash">-</div>
+              <div class="scoreR">${R}</div>
+            </div>
+          `;
         }
 
-        let statusHTML = "";
+        // 只有 pre 顯示開打時間（放大）；不顯示「尚未開打」
+        let timeHTML = "";
         if (g.state === "pre") {
-          statusHTML = `<div class="status muted">尚未開打</div>`;
-        } else if (g.state === "in") {
+          timeHTML = `<div class="starttime">台灣開打時間：${twStart}</div>`;
+        }
+
+        // 狀態文字
+        let statusHTML = "";
+        if (g.state === "in") {
           const extra = g.detail ? `（${g.detail}）` : "";
           statusHTML = `<div class="status muted">進行中 ${extra}</div>`;
-        } else {
+        } else if (g.state !== "pre") {
           statusHTML = `<div class="status ${g.win ? "ok" : "bad"}">結果：${g.win ? "贏球" : "輸球"}</div>`;
         }
 
         return `
           <div class="game">
             <div class="tag">${labels[idx] || ""}</div>
-            <div class="teamline">${headerHTML}</div>
+            ${teamHTML}
             ${scoreHTML}
             ${statusHTML}
             ${timeHTML}
@@ -364,10 +394,8 @@
     }
 
     refreshBtn.addEventListener("click", load);
-
     load();
     setInterval(load, 15000);
   </script>
 </body>
 </html>
-
