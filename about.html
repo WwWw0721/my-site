@@ -449,14 +449,15 @@
       listEl.textContent = "載入失敗（可能是網路或資料來源暫時不可用）。";
       metaEl.innerHTML = `更新時間（台灣）：<span class="mono">${
         new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ })
-      }</span>（每 15 秒自動更新）`;
+      }</span>（每 5 秒自動更新）`;
 
       isLoading = false;
     }
 
     refreshBtn.addEventListener("click", load);
     load();
-    setInterval(load, 15000);
+    setInterval(load, 5000);
   </script>
 </body>
 </html>
+
