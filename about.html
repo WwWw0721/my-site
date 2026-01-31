@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>湖人</title>
+  <title>菜翔翔</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     .wrap { max-width: 860px; margin: 0 auto; }
@@ -73,7 +73,7 @@
       font-weight: 950;
       letter-spacing: .6px;
       text-align:center;
-      min-width: 40px; /* 讓中間欄穩定 */
+      min-width: 40px; /* 中間欄固定寬，讓對齊穩定 */
     }
 
     .scoreline{
@@ -87,7 +87,7 @@
     .scoreR{ text-align:left; }
     .dash{
       text-align:center;
-      min-width: 40px;  /* ✅ 跟 .vs 同寬，保證「-」在 VS 正下方 */
+      min-width: 40px; /* ✅ 跟 .vs 同寬，保證「-」在 VS 正下方 */
       opacity: .9;
     }
 
@@ -99,6 +99,7 @@
     .ok { color: #9fe8a7; }
     .bad { color: #ffb0b0; }
 
+    /* 開打時間放大（只給 pre 用） */
     .starttime{
       font-size: 22px;
       font-weight: 900;
@@ -115,7 +116,7 @@
       <div class="brand">MySite</div>
       <div class="nav-links">
         <a href="index.html">首頁</a>
-        <a href="about.html">洛杉磯湖人</a>
+        <a href="about.html">菜翔翔</a>
         <a href="projects.html">麻將計算機</a>
       </div>
     </div>
@@ -123,7 +124,7 @@
 
   <main class="container">
     <section class="hero">
-      <h1>洛杉磯湖人</h1>
+      <h1>菜翔翔</h1>
       <p>湖人最新三場（自動每 15 秒更新，也可手動更新）。</p>
     </section>
 
@@ -150,12 +151,18 @@
   <script>
     const TW_TZ = "Asia/Taipei";
     const TEAM_ID_LAKERS = 13;
+    const LAKERS_ABBR = "LAL";
 
+    // 先用 schedule 找出「最新三場」
     const SCHEDULE_URLS = [
       `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`,
       `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`
     ];
 
+    // 再用 summary 取得「即時比分」
+    const SUMMARY_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=";
+
+    // 中文隊名表：含 ESPN 常見縮寫別名
     const TEAM_ZH = {
       ATL:"亞特蘭大老鷹",
       BOS:"波士頓塞爾提克",
@@ -204,6 +211,7 @@
     }
 
     async function fetchJson(url) {
+      // 先直連 ESPN；失敗再走 proxy（避免 GitHub Pages CORS）
       try {
         const r = await fetch(url, { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -231,12 +239,13 @@
       return null;
     }
 
-    function toGameItem(ev) {
+    // schedule → 基本資料（可能不即時）
+    function toGameItemFromSchedule(ev) {
       const comp = ev?.competitions?.[0];
       const competitors = comp?.competitors || [];
 
-      const lal = competitors.find(c => c?.team?.abbreviation === "LAL");
-      const opp = competitors.find(c => c?.team?.abbreviation !== "LAL");
+      const lal = competitors.find(c => c?.team?.abbreviation === LAKERS_ABBR);
+      const opp = competitors.find(c => c?.team?.abbreviation !== LAKERS_ABBR);
       if (!lal || !opp) return null;
 
       const status = comp?.status?.type || {};
@@ -250,7 +259,11 @@
       const dateISO = comp?.date || ev?.date;
       const ms = dateISO ? new Date(dateISO).getTime() : 0;
 
+      // ✅ eventId：summary 需要它
+      const eventId = ev?.id || comp?.id || null;
+
       return {
+        eventId,
         date: dateISO,
         ms,
         state: state || (completed ? "post" : ""),
@@ -262,6 +275,57 @@
         oScore,
         win: !!lal.winner
       };
+    }
+
+    // summary → 即時比分/狀態（會比 schedule 更準）
+    function toGameItemFromSummary(baseGame, sum) {
+      const comp =
+        sum?.header?.competitions?.[0] ||
+        sum?.competitions?.[0] ||
+        sum?.gamepackageJSON?.header?.competitions?.[0] ||
+        null;
+
+      if (!comp) return baseGame;
+
+      const competitors = comp?.competitors || [];
+      const lal = competitors.find(c => c?.team?.abbreviation === LAKERS_ABBR);
+      const opp = competitors.find(c => c?.team?.abbreviation !== LAKERS_ABBR);
+      if (!lal || !opp) return baseGame;
+
+      const status = comp?.status?.type || {};
+      const state = status?.state || baseGame.state;
+      const completed = !!status?.completed;
+      const detail = status?.shortDetail || status?.detail || status?.description || baseGame.detail;
+
+      const lScore = scoreNum(lal);
+      const oScore = scoreNum(opp);
+
+      const dateISO = comp?.date || baseGame.date;
+      const ms = dateISO ? new Date(dateISO).getTime() : baseGame.ms;
+
+      return {
+        ...baseGame,
+        date: dateISO,
+        ms,
+        state,
+        completed,
+        detail,
+        lName: zhTeamName(lal.team),
+        oName: zhTeamName(opp.team),
+        lScore,
+        oScore,
+        win: !!lal.winner
+      };
+    }
+
+    async function enrichWithSummary(game) {
+      if (!game?.eventId) return game; // 沒 ID 就沒法查 summary
+      try {
+        const sum = await fetchJson(SUMMARY_BASE + encodeURIComponent(game.eventId));
+        return toGameItemFromSummary(game, sum);
+      } catch {
+        return game; // summary 失敗就退回 schedule 的資料
+      }
     }
 
     function pickLatest3(games) {
@@ -307,7 +371,6 @@
       listEl.innerHTML = games.map((g, idx) => {
         const twStart = fmtTW(g.date);
 
-        // ✅ 隊名列（對稱）
         const teamHTML = `
           <div class="matchgrid teamline">
             <div class="teamL">${g.lName}</div>
@@ -316,7 +379,6 @@
           </div>
         `;
 
-        // ✅ 比分列（對稱；「-」在 VS 正下方）
         let scoreHTML = "";
         if (g.state !== "pre") {
           const L = (g.lScore != null) ? g.lScore : "—";
@@ -330,13 +392,11 @@
           `;
         }
 
-        // 只有 pre 顯示開打時間（放大）；不顯示「尚未開打」
         let timeHTML = "";
         if (g.state === "pre") {
           timeHTML = `<div class="starttime">台灣開打時間：${twStart}</div>`;
         }
 
-        // 狀態文字
         let statusHTML = "";
         if (g.state === "in") {
           const extra = g.detail ? `（${g.detail}）` : "";
@@ -369,10 +429,15 @@
         try {
           const data = await fetchJson(url);
           const events = data?.events || [];
-          const games = events.map(toGameItem).filter(Boolean);
+          const games = events.map(toGameItemFromSchedule).filter(Boolean);
 
+          // 先挑出最新三場（用 schedule 的日期/狀態）
           const latest3 = pickLatest3(games);
-          renderGames(latest3);
+
+          // ✅ 再用 summary 把這 3 場補成「即時比分」
+          const enriched = await Promise.all(latest3.map(enrichWithSummary));
+
+          renderGames(enriched);
 
           metaEl.innerHTML = `更新時間（台灣）：<span class="mono">${
             new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ })
@@ -399,7 +464,3 @@
   </script>
 </body>
 </html>
-
-
-
-
