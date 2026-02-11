@@ -50,6 +50,7 @@
       margin-bottom: 8px;
     }
 
+    /* ✅ 對稱排版：隊名/比分同一個 3 欄 grid，讓 VS 與 - 垂直對齊 */
     .matchgrid{
       display:grid;
       grid-template-columns: 1fr auto 1fr;
@@ -86,7 +87,7 @@
     .scoreR{ text-align:left; }
     .dash{
       text-align:center;
-      min-width: 40px;
+      min-width: 40px; /* ✅ 跟 .vs 同寬，保證「-」在 VS 正下方 */
       opacity: .9;
     }
 
@@ -98,6 +99,7 @@
     .ok { color: #9fe8a7; }
     .bad { color: #ffb0b0; }
 
+    /* 開打時間放大（只給 pre 用） */
     .starttime{
       font-size: 22px;
       font-weight: 900;
@@ -123,7 +125,7 @@
   <main class="container">
     <section class="hero">
       <h1>洛杉磯湖人</h1>
-      <p>湖人最新三場（自動每 5 秒更新，也可手動更新）。</p>
+      <p>湖人最新三場（比賽進行中才每 15 秒自動更新，也可手動更新）。</p>
     </section>
 
     <section class="grid">
@@ -151,11 +153,13 @@
     const TEAM_ID_LAKERS = 13;
     const LAKERS_ABBR = "LAL";
 
+    // 先用 schedule 找出「最新三場」
     const SCHEDULE_URLS = [
       `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`,
       `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${TEAM_ID_LAKERS}/schedule`
     ];
 
+    // 再用 summary 取得「即時比分」
     const SUMMARY_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=";
 
     const TEAM_ZH = {
@@ -286,8 +290,6 @@
       const status = comp?.status?.type || {};
       const state = status?.state || baseGame.state;
       const completed = !!status?.completed;
-
-      // ✅ 這裡會拿到 "HALFTIME" / "Half" / "Halftime" 等字樣
       const detail = status?.shortDetail || status?.detail || status?.description || baseGame.detail;
 
       const lScore = scoreNum(lal);
@@ -353,7 +355,6 @@
       return finals.slice(-3).reverse();
     }
 
-    // ✅ 把 halftime 顯示改成「半場」
     function localizeDetail(detail) {
       if (!detail) return "";
       return String(detail).replace(/halftime/ig, "半場");
@@ -416,6 +417,23 @@
       }).join("");
     }
 
+    // ✅ 只在「比賽進行中」才自動更新（15秒）
+    const AUTO_MS = 15000;
+    let autoTimer = null;
+
+    function setAutoUpdate(shouldRun) {
+      if (shouldRun) {
+        if (autoTimer == null) {
+          autoTimer = setInterval(load, AUTO_MS);
+        }
+      } else {
+        if (autoTimer != null) {
+          clearInterval(autoTimer);
+          autoTimer = null;
+        }
+      }
+    }
+
     let isLoading = false;
 
     async function load() {
@@ -435,9 +453,12 @@
 
           renderGames(enriched);
 
+          const inProgress = enriched.some(g => g.state === "in");
+          setAutoUpdate(inProgress);
+
           metaEl.innerHTML = `更新時間（台灣）：<span class="mono">${
             new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ })
-          }</span>（每 5 秒自動更新）`;
+          }</span>${inProgress ? "（比賽進行中：每 15 秒自動更新）" : "（未進行中：停止自動更新）"}`;
 
           isLoading = false;
           return;
@@ -446,19 +467,20 @@
         }
       }
 
+      // 兩個 URL 都失敗：停止自動更新，避免一直刷
+      setAutoUpdate(false);
+
       listEl.textContent = "載入失敗（可能是網路或資料來源暫時不可用）。";
       metaEl.innerHTML = `更新時間（台灣）：<span class="mono">${
         new Date().toLocaleString("zh-Hant-TW", { timeZone: TW_TZ })
-      }</span>（每 5 秒自動更新）`;
+      }</span>（未進行中：停止自動更新）`;
 
       isLoading = false;
     }
 
     refreshBtn.addEventListener("click", load);
-    load();
-    setInterval(load, 5000);
+
+    load(); // 進頁面先載入一次（是否要自動更新由 load() 判斷）
   </script>
 </body>
 </html>
-
-
